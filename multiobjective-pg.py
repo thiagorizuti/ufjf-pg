@@ -68,7 +68,7 @@ pset.addPrimitive(safeDiv, [float,float], float)
 pset.addTerminal(False, bool)
 pset.addTerminal(True, bool)
 
-creator.create("FitnessMulti", base.Fitness, weights=(1.0,))
+creator.create("FitnessMulti", base.Fitness, weights=(1.0,1.0))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
@@ -80,45 +80,11 @@ toolbox.register("compile", gp.compile, pset=pset)
 
 def eval(individual):
     func = toolbox.compile(expr=individual)
-    fit = 0
-    total = 0
-    for line in train:
-        result = func(float(line[0]),float(line[1]),float(line[2]),float(line[3]),
-        float(line[4]),float(line[5]),float(line[6]))
-        if result and int(line[7]) == 1:
-            fit += 1
-        if not result and int(line[7])  == 0:
-            fit += 1
-        total += 1
-    return  float(fit)/total,
-
-toolbox.register("evaluate", eval)
-toolbox.register("select", tools.selRoulette)
-toolbox.register("mate", gp.cxOnePoint)
-toolbox.register("expr_mut", gp.genGrow, min_=0, max_=2)
-toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
-
-def overral_accuracy(individual, dataset):
-    func = toolbox.compile(expr=individual)
-    fit = 0
-    total = 0
-    for line in dataset:
-        result = func(float(line[0]),float(line[1]),float(line[2]),float(line[3]),
-        float(line[4]),float(line[5]),float(line[6]))
-        if result and int(line[7]) == 1:
-            fit += 1
-        if not result and int(line[7])  == 0:
-            fit += 1
-        total += 1
-    return  float(fit)/total,
-
-def class_accuracy(individual, dataset):
-    func = toolbox.compile(expr=individual)
     fit0 = 0
     fit1 = 0
     total0 = 0
     total1 = 0
-    for line in dataset:
+    for line in train:
         result = func(line[0],line[1],line[2],line[3],
         line[4],line[5],line[6])
         if line[7] == 0:
@@ -129,7 +95,39 @@ def class_accuracy(individual, dataset):
             total1 += 1
             if result:
                 fit1 += 1
-    return  float(fit0)/total0, float(fit1)/total1,
+    return  float(fit0)/total0, float(fit1)/total1
+
+toolbox.register("evaluate", eval)
+toolbox.register("select", tools.selNSGA2)
+toolbox.register("mate", gp.cxOnePoint)
+toolbox.register("expr_mut", gp.genGrow, min_=0, max_=2)
+toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
+
+
+def accuracy(individual, dataset):
+    func = toolbox.compile(expr=individual)
+    acc = 0    
+    acc0 = 0
+    acc1 = 0
+    total = 0
+    total0 = 0
+    total1 = 0
+    for line in dataset:
+        result = func(line[0],line[1],line[2],line[3],
+        line[4],line[5],line[6])
+        if line[7] == 0:
+            total +=1
+            total0 += 1
+            if result:
+                acc += 1
+                acc0 += 1
+        if line[7] == 1:
+            total +=1
+            total1 += 1
+            if result:
+                acc += 1
+                acc1 += 1
+    return  float(acc)/total, float(acc0)/total0, float(acc1)/total1
 
 def main():
 
@@ -142,7 +140,7 @@ def main():
 
     for ind in hof:
         ind1 = ind
-        print class_accuracy(ind,test), overral_accuracy(ind,test)
+        print accuracy(ind,test)
        
     return 0
 
