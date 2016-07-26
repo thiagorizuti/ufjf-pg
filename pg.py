@@ -12,52 +12,65 @@ from deap import creator
 from deap import tools
 from deap import gp
 
-with open("train.csv") as dataset:
+with open("ecoli3.csv") as dataset:
     reader = csv.reader(dataset)
-    train = list(list((True if elem == '1' else False) for elem in row) for row in reader)
+    train = list(list(elem for elem in row) for row in reader)
 
+pset = gp.PrimitiveSetTyped("main", [float,float,float,float,float,float,float],bool)
 
-
-pset = gp.PrimitiveSetTyped("MAIN", itertools.repeat(bool, 6), bool)
+def safeDiv(a, b):
+    if b == 0:
+        return 0
+    return a / b
+pset.addPrimitive(operator.lt, [float, float], bool)
+pset.addPrimitive(operator.le, [float, float], bool)
+pset.addPrimitive(operator.gt, [float, float], bool)
+pset.addPrimitive(operator.ge, [float, float], bool)
+pset.addPrimitive(operator.eq, [float, float], bool)
+pset.addPrimitive(operator.ne, [float, float], bool)
 pset.addPrimitive(operator.xor, [bool, bool], bool)
 pset.addPrimitive(operator.and_, [bool, bool], bool)
 pset.addPrimitive(operator.or_, [bool, bool], bool)
 pset.addPrimitive(operator.not_, [bool], bool)
-
+pset.addPrimitive(operator.add, [float,float], float)
+pset.addPrimitive(operator.sub, [float,float], float)
+pset.addPrimitive(operator.mul, [float,float], float)
+pset.addPrimitive(safeDiv, [float,float], float)
 pset.addTerminal(False, bool)
 pset.addTerminal(True, bool)
 
-creator.create("FitnessMulti", base.Fitness, weights=(1.0,2.0 ))
+creator.create("FitnessMulti", base.Fitness, weights=(1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMulti)
 
 toolbox = base.Toolbox()
-toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=3)
+toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
 toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 toolbox.register("compile", gp.compile, pset=pset)
 
+
 def eval(individual):
     func = toolbox.compile(expr=individual)
-    class1 = 0
-    class2 = 0
+    fit = 0
     total = 0
     for line in train:
-        result = func(line[0],line[1],line[2],line[3],line[4],line[5])
-        if line[6] and result:
-            class1 += 1
-        if not line[6] and not result:
-            class2 += 1
-        total +=1
-    return  class1, class2
+        result = func(float(line[0]),float(line[1]),float(line[2]),float(line[3]),
+        float(line[4]),float(line[5]),float(line[6]))
+        if result and int(line[7]) == 1:
+            fit += 1
+        if not result and int(line[7])  == 0:
+            fit += 1
+        total += 1
+    return  float(fit)/total,
 
 toolbox.register("evaluate", eval)
-toolbox.register("select", tools.selNSGA2)
+toolbox.register("select", tools.selRoulette)
 toolbox.register("mate", gp.cxOnePoint)
-toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
+toolbox.register("expr_mut", gp.genGrow, min_=0, max_=2)
 toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=pset)
 
 def main():
-
+    random.seed(10)
     pop = toolbox.population(n=100)
     hof = tools.HallOfFame(5)
     cxpb = 0.5
